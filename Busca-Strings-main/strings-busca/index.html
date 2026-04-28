@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>String Busca Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,800;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Paleta Light Mode Clean */
+  --fundo:           #f8fafc;
+  --superficie:      #ffffff;
+  --superficie2:     #f1f5f9;
+  --borda:           #e2e8f0;
+  --borda2:          #cbd5e1;
+  --texto:           #0f172a;
+  --muted:           #64748b;
+  
+  /* Cores de destaque ajustadas para contraste no fundo claro */
+  --acento:          #4f46e5;
+  --acento2:         #9333ea;
+  --verde:           #10b981;
+  --amarelo:         #eab308;
+  --vermelho:        #ef4444;
+  --ciano:           #0ea5e9;
+  
+  /* Cores dos algoritmos */
+  --cor-naive:     #4f46e5;
+  --cor-rabinkarp:   #db2777;
+  --cor-kmp:         #10b981;
+  --cor-boyermoore:  #ea580c;
+  
+  --raio:    10px;
+  --raio-lg: 18px;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body { background: var(--fundo); color: var(--texto); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--superficie); }
+::-webkit-scrollbar-thumb { background: var(--borda2); border-radius: 3px; }
+
+/* ── layout ─────────────────────────────────────────────── */
+.shell { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+header {
+  padding: 1.1rem 2rem; border-bottom: 1px solid var(--borda);
+  background: var(--superficie); display: flex; align-items: center; gap: 1rem;
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em; }
+.logo span { color: var(--acento); }
+.logo-sub { font-family: var(--mono); font-size: .65rem; color: var(--muted); margin-top: .1rem; }
+.espaco { flex: 1; }
+.badge {
+  font-family: var(--mono); font-size: .62rem;
+  background: rgba(79, 70, 229, .1); border: 1px solid rgba(79, 70, 229, .25);
+  color: var(--acento); padding: .2rem .6rem; border-radius: 4px; white-space: nowrap;
+}
+.main { display: grid; grid-template-columns: 370px 1fr; height: calc(100vh - 54px); }
+
+/* ── sidebar ─────────────────────────────────────────────── */
+.sidebar {
+  background: var(--superficie); border-right: 1px solid var(--borda);
+  overflow-y: auto; padding: 1.4rem; display: flex; flex-direction: column; gap: 1.3rem;
+}
+.sec-titulo {
+  font-family: var(--mono); font-size: .62rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
+  display: flex; align-items: center; gap: .5rem; margin-bottom: .7rem;
+}
+.sec-titulo::after { content: ''; flex: 1; height: 1px; background: var(--borda); }
+textarea, input[type=text] {
+  width: 100%; background: var(--superficie2); border: 1px solid var(--borda);
+  border-radius: var(--raio); color: var(--texto); font-family: var(--mono); font-size: .78rem;
+  padding: .7rem; resize: vertical; outline: none; transition: border .2s;
+}
+textarea:focus, input[type=text]:focus { border-color: var(--acento); background: var(--superficie); }
+textarea { min-height: 100px; max-height: 200px; }
+.lbl { font-size: .72rem; color: var(--muted); margin-bottom: .3rem; display: block; font-weight: 600; }
+.zona-upload {
+  border: 1.5px dashed var(--borda2); border-radius: var(--raio);
+  padding: .85rem; text-align: center; cursor: pointer; transition: all .2s; background: var(--superficie2);
+}
+.zona-upload:hover { border-color: var(--acento); background: rgba(79, 70, 229,.05); }
+.zona-upload input { display: none; }
+.upload-icone { font-size: 1.3rem; margin-bottom: .25rem; }
+.upload-txt { font-size: .7rem; color: var(--muted); }
+#lista-arq { font-family: var(--mono); font-size: .65rem; color: var(--verde); margin-top: .35rem; text-align: left; }
+.grade-algos { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.card-algo {
+  border: 1.5px solid var(--borda); border-radius: var(--raio);
+  padding: .6rem .65rem; cursor: pointer; transition: all .2s; background: var(--superficie2);
+}
+.card-algo:hover { border-color: var(--borda2); }
+.card-algo.sel { background: rgba(79, 70, 229,.08); }
+.card-algo .nome { font-size: .76rem; font-weight: 700; color: var(--texto); }
+.card-algo .cmplx { font-family: var(--mono); font-size: .6rem; color: var(--muted); margin-top: .12rem; }
+.card-algo[data-algo="naive"].sel     { border-color: var(--cor-naive);    background: rgba(79, 70, 229,.08); }
+.card-algo[data-algo="rabin-karp"].sel  { border-color: var(--cor-rabinkarp);  background: rgba(219, 39, 119,.08); }
+.card-algo[data-algo="kmp"].sel         { border-color: var(--cor-kmp);        background: rgba(16, 185, 129,.08);  }
+.card-algo[data-algo="boyer-moore"].sel { border-color: var(--cor-boyermoore); background: rgba(234, 88, 12,.08);  }
+.linha-btn { display: flex; gap: .45rem; }
+.btn {
+  flex: 1; padding: .6rem; border-radius: var(--raio); border: 1px solid var(--borda);
+  font-family: var(--sans); font-size: .78rem; font-weight: 700; cursor: pointer;
+  transition: all .18s; display: flex; align-items: center; justify-content: center; gap: .35rem;
+}
+.btn-p  { background: var(--acento); border-color: var(--acento); color: #fff; }
+.btn-p:hover { background: #4338ca; transform: translateY(-1px); }
+.btn-s  { background: var(--superficie); color: var(--texto); border-color: var(--borda); }
+.btn-s:hover { background: var(--superficie2); border-color: var(--borda2); }
+.btn-cmp {
+  width: 100%;
+  background: linear-gradient(135deg,rgba(79, 70, 229,.1),rgba(147, 51, 234,.1));
+  border: 1px solid rgba(79, 70, 229,.2); color: var(--acento2);
+}
+.btn-cmp:hover { background: linear-gradient(135deg,rgba(79, 70, 229,.15),rgba(147, 51, 234,.15)); transform: translateY(-1px); }
+.btn:disabled { opacity: .38; cursor: not-allowed; transform: none !important; }
+
+/* ── conteúdo ────────────────────────────────────────────── */
+.conteudo { overflow-y: auto; display: flex; flex-direction: column; }
+.abas {
+  display: flex; border-bottom: 1px solid var(--borda); padding: 0 1.4rem;
+  background: var(--superficie); position: sticky; top: 0; z-index: 50;
+}
+.aba {
+  padding: .8rem 1.1rem; font-size: .78rem; font-weight: 700; cursor: pointer;
+  border-bottom: 2px solid transparent; color: var(--muted); transition: all .2s; white-space: nowrap;
+}
+.aba:hover { color: var(--texto); }
+.aba.ativa { color: var(--acento); border-bottom-color: var(--acento); }
+.painel { display: none; padding: 1.4rem; flex: 1; flex-direction: column; gap: 1.3rem; }
+.painel.ativo { display: flex; }
+
+/* ── cards ───────────────────────────────────────────────── */
+.card {
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--raio-lg); padding: 1.2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+.cab-card { display: flex; align-items: center; gap: .7rem; margin-bottom: .95rem; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.titulo-card { font-size: .88rem; font-weight: 700; }
+.badge-card { font-family: var(--mono); font-size: .6rem; padding: .14rem .48rem; border-radius: 4px; margin-left: auto; }
+
+/* ── métricas ────────────────────────────────────────────── */
+.metricas { display: flex; gap: .65rem; flex-wrap: wrap; margin-bottom: .9rem; }
+.metrica { background: var(--superficie2); border: 1px solid var(--borda); border-radius: 8px; padding: .45rem .7rem; flex: 1; min-width: 85px; }
+.metrica .val { font-family: var(--mono); font-size: .95rem; font-weight: 800; color: var(--texto); }
+.metrica .rot { font-size: .6rem; color: var(--muted); margin-top: .08rem; }
+
+/* ── posições ────────────────────────────────────────────── */
+.posicoes { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .7rem; }
+.chip { font-family: var(--mono); font-size: .68rem; font-weight: 600; padding: .18rem .48rem; border-radius: 5px; background: rgba(16, 185, 129,.1); color: var(--verde); border: 1px solid rgba(16, 185, 129,.2); }
+.sem-match { font-family: var(--mono); font-size: .78rem; color: var(--muted); }
+.linha-cx { display: flex; gap: .45rem; flex-wrap: wrap; }
+.badge-cx { font-family: var(--mono); font-size: .63rem; padding: .18rem .5rem; border-radius: 5px; border: 1px solid var(--borda2); color: var(--muted); background: var(--superficie2); }
+.badge-cx span { font-weight: 700; color: var(--ciano); }
+
+/* ── visualizador texto ──────────────────────────────────── */
+.vis-txt {
+  font-family: var(--mono); font-size: .76rem; line-height: 2.1; word-break: break-all;
+  background: var(--superficie2); border: 1px solid var(--borda);
+  border-radius: var(--raio); padding: .9rem; max-height: 175px; overflow-y: auto; color: var(--texto);
+}
+.ch { display: inline; padding: 0 1px; border-radius: 2px; cursor: default; transition: background .08s; }
+.ch.janela    { background: rgba(79, 70, 229,.15); }
+.ch.encontrou { background: var(--verde) !important; color: #fff !important; font-weight: 700; }
+.ch.falhou    { background: rgba(239, 68, 68,.15) !important; color: var(--vermelho) !important; }
+
+/* ── visualizador padrão ─────────────────────────────────── */
+.vis-pad { display: flex; gap: 2px; margin-top: .45rem; flex-wrap: wrap; }
+.cp {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: .73rem; font-weight: 600;
+  border: 1px solid var(--borda2); border-radius: 5px; background: var(--superficie2); transition: all .12s; color: var(--texto);
+}
+.cp.encontrou { background: var(--verde);            border-color: var(--verde);    color: #fff; }
+.cp.falhou    { background: rgba(239, 68, 68,.15);   border-color: rgba(239, 68, 68,.3); color: var(--vermelho); }
+
+/* ── log ─────────────────────────────────────────────────── */
+.log {
+  font-family: var(--mono); font-size: .7rem; background: var(--superficie2);
+  border: 1px solid var(--borda); border-radius: var(--raio);
+  max-height: 190px; overflow-y: auto; padding: .7rem;
+}
+.log-linha { padding: .28rem .45rem; border-radius: 5px; margin-bottom: .18rem; display: flex; align-items: flex-start; gap: .45rem; }
+.log-linha.ok   { background: rgba(16, 185, 129,.1); color: #059669; }
+.log-linha.fail { background: rgba(239, 68, 68,.1); color: #dc2626; }
+.log-linha.info { background: rgba(14, 165, 233,.1);  color: #0284c7; }
+.num-p { color: var(--muted); min-width: 3ch; text-align: right; flex-shrink: 0; }
+
+/* ── controles passo ─────────────────────────────────────── */
+.ctrl-passo { display: flex; align-items: center; gap: .65rem; }
+.slider {
+  flex: 1; appearance: none; height: 4px; border-radius: 2px; background: var(--borda2); outline: none;
+}
+.slider::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--acento); cursor: pointer; border: none; }
+.cnt-passo { font-family: var(--mono); font-size: .7rem; color: var(--muted); white-space: nowrap; }
+
+/* ── tabelas ─────────────────────────────────────────────── */
+.tbl { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: .7rem; }
+.tbl th { background: var(--superficie2); padding: .38rem .55rem; text-align: left; color: var(--muted); border: 1px solid var(--borda); font-weight: 600; }
+.tbl td { padding: .32rem .55rem; border: 1px solid var(--borda); color: var(--texto); }
+.tbl tr:hover td { background: rgba(79, 70, 229,.03); }
+
+/* ── comparação ──────────────────────────────────────────── */
+.grade-cmp { display: grid; grid-template-columns: repeat(2,1fr); gap: .95rem; }
+.card-cmp { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-lg); padding: 1.05rem; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+.titulo-cmp { font-size: .78rem; font-weight: 700; margin-bottom: .7rem; }
+.barras { display: flex; flex-direction: column; gap: .4rem; }
+.linha-barra { display: flex; align-items: center; gap: .55rem; }
+.lbl-barra { font-family: var(--mono); font-size: .62rem; color: var(--muted); width: 95px; flex-shrink: 0; text-align: right; }
+.trilha { flex: 1; background: var(--superficie2); border-radius: 4px; height: 18px; overflow: hidden; border: 1px solid var(--borda); }
+.preench { height: 100%; border-radius: 4px; transition: width .55s cubic-bezier(.23,1,.32,1); display: flex; align-items: center; padding: 0 .38rem; }
+.val-barra { font-family: var(--mono); font-size: .58rem; font-weight: 700; color: #fff; white-space: nowrap; }
+
+/* ── vazio / loader ──────────────────────────────────────── */
+.vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; color: var(--muted); gap: .7rem; text-align: center; flex: 1; }
+.vazio-i { font-size: 2.4rem; opacity: .4; }
+.vazio-t { font-size: .83rem; }
+.loader { display: inline-block; width: 15px; height: 15px; border: 2px solid rgba(0,0,0,.1); border-top-color: currentColor; border-radius: 50%; animation: girar .7s linear infinite; }
+
+@keyframes girar { to { transform: rotate(360deg); } }
+@keyframes surgir { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+.surgir { animation: surgir .28s ease both; }
+
+@media (max-width: 860px) {
+  .main { grid-template-columns: 1fr; }
+  .sidebar { max-height: 48vh; }
+  .grade-cmp { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header>
+  <div>
+    <div class="logo">String<span>Busca</span>Lab</div>
+    <div class="logo-sub">Algoritmos de Busca em strings · Padrão Strategy</div>
+  </div>
+  <div class="espaco"></div>
+</header>
+
+<div class="main">
+
+<aside class="sidebar">
+
+  <div>
+    <div class="sec-titulo">Texto fonte</div>
+    <label class="zona-upload" id="zona-upload">
+      <input type="file" id="input-arq" accept=".txt" multiple>
+      <div class="upload-icone">📁</div>
+      <div class="upload-txt">Clique ou arraste arquivos <strong>.txt</strong></div>
+      <div id="lista-arq"></div>
+    </label>
+    <div style="margin:.45rem 0;text-align:center;font-size:.62rem;color:var(--muted)">— ou —</div>
+    <label class="lbl">Digitar texto manualmente</label>
+    <textarea id="input-txt" placeholder="Cole ou digite o texto aqui…" rows="4"></textarea>
+    <div id="tam-txt" style="margin-top:.28rem;font-family:var(--mono);font-size:.62rem;color:var(--muted)">0 caracteres</div>
+  </div>
+
+  <div>
+    <div class="sec-titulo">Padrão de busca</div>
+    <label class="lbl">String a buscar no texto</label>
+    <input type="text" id="input-pad" placeholder="Ex: abab">
+    <div id="tam-pad" style="margin-top:.28rem;font-family:var(--mono);font-size:.62rem;color:var(--muted)">0 caracteres</div>
+  </div>
+
+  <div>
+    <div class="sec-titulo">Algoritmo</div>
+    <div class="grade-algos" id="grade-algos">
+      <div class="card-algo sel" data-algo="naive">
+        <div class="nome">Naive</div><div class="cmplx">O(n·m)</div>
+      </div>
+      <div class="card-algo" data-algo="rabin-karp">
+        <div class="nome">Rabin-Karp</div><div class="cmplx">O(n+m)</div>
+      </div>
+      <div class="card-algo" data-algo="kmp">
+        <div class="nome">KMP</div><div class="cmplx">O(n+m)</div>
+      </div>
+      <div class="card-algo" data-algo="boyer-moore">
+        <div class="nome">Boyer-Moore</div><div class="cmplx">O(n/m)</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sec-titulo">Executar</div>
+    <div class="linha-btn" style="margin-bottom:.45rem">
+      <button class="btn btn-p" id="btn-exec">▶ Executar</button>
+      <button class="btn btn-s" id="btn-passo">⏩ Passo a passo</button>
+    </div>
+    <button class="btn btn-cmp" id="btn-cmp">⚡ Comparar todos os algoritmos</button>
+  </div>
+
+</aside>
+
+<main class="conteudo">
+
+  <div class="abas">
+    <div class="aba ativa" data-aba="resultado">Resultado</div>
+    <div class="aba" data-aba="passos">Passo a Passo</div>
+    <div class="aba" data-aba="tabelas">Tabelas Internas</div>
+    <div class="aba" data-aba="comparacao">Comparação</div>
+  </div>
+
+  <div class="painel ativo" id="painel-resultado">
+    <div class="vazio" id="vazio-res"><div class="vazio-i">🔍</div><div class="vazio-t">Execute uma busca para ver os resultados</div></div>
+    <div id="cont-res" style="display:none;flex-direction:column;gap:1rem"></div>
+  </div>
+
+  <div class="painel" id="painel-passos">
+    <div class="vazio" id="vazio-pas"><div class="vazio-i">⏯️</div><div class="vazio-t">Clique em "Passo a Passo" para visualizar a execução do algoritmo</div></div>
+    <div id="cont-pas" style="display:none;flex-direction:column;gap:1rem">
+      <div class="card">
+        <div class="cab-card">
+          <span class="dot" id="dot-pas"></span>
+          <span class="titulo-card" id="nome-pas"></span>
+          <span class="cnt-passo" id="cnt-pas" style="margin-left:auto"></span>
+        </div>
+        <div class="ctrl-passo" style="margin-bottom:.9rem">
+          <button class="btn btn-s" id="btn-ant" style="flex:0;padding:.38rem .7rem;font-size:.78rem">◀</button>
+          <input type="range" class="slider" id="slider" min="0" value="0">
+          <button class="btn btn-s" id="btn-prox" style="flex:0;padding:.38rem .7rem;font-size:.78rem">▶</button>
+          <button class="btn btn-p" id="btn-rep" style="flex:0;padding:.38rem .8rem;font-size:.78rem">▶ Auto</button>
+        </div>
+        <div class="sec-titulo">Texto</div>
+        <div class="vis-txt" id="vis-txt"></div>
+        <div class="sec-titulo" style="margin-top:.7rem">Padrão</div>
+        <div class="vis-pad" id="vis-pad"></div>
+      </div>
+      <div class="card">
+        <div class="sec-titulo">Log do passo atual</div>
+        <div class="log" id="log-pas"></div>
+      </div>
+      <div class="card">
+        <div class="sec-titulo">Métricas parciais</div>
+        <div class="metricas" id="met-pas"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="painel" id="painel-tabelas">
+    <div class="vazio" id="vazio-tab"><div class="vazio-i">📊</div><div class="vazio-t">Execute um algoritmo para ver suas tabelas internas</div></div>
+    <div id="cont-tab" style="display:none;flex-direction:column;gap:1rem"></div>
+  </div>
+
+  <div class="painel" id="painel-comparacao">
+    <div class="vazio" id="vazio-cmp"><div class="vazio-i">⚡</div><div class="vazio-t">Clique em "Comparar todos" para ver a análise comparativa</div></div>
+    <div id="cont-cmp" style="display:none;flex-direction:column;gap:1rem"></div>
+  </div>
+
+</main>
+</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  ALGORITMOS DE BUSCA EM STRINGS — implementados em JavaScript
+//  NÃO CONSEGUI FAZER UM FRONT COM PYTHON PROFESSOR ENTÃO FIZ A ATIVIDADE EM PYTHON, 
+//  MAS PEDI PRA IA COLOCAR EM JS PRA MOSTRAR EM HTML
+//
+//  Interface esperada por cada algoritmo:
+//    algoritmo.nome           → string com o nome
+//    algoritmo.complexidade   → { melhor, medio, pior }
+//    algoritmo.buscar(texto, padrao) → ResultadoBusca
+//
+//  ResultadoBusca = {
+//    algoritmo, posicoes, comparacoes, tempo_ms,
+//    tamanho_texto, tamanho_padrao, complexidade,
+//    tabelas_extras, passos: [{ numero, posicao_texto,
+//      posicao_padrao, descricao, houve_match,
+//      destaque_texto, destaque_padrao, dados_extras }]
+//  }
+// ══════════════════════════════════════════════════════════════
+
+// ── Helper: monta o objeto de resultado ─────────────────────
+function montarResultado(nome, cx, texto, padrao, posicoes, comparacoes, passos, tempoMs, tabelasExtras = {}) {
+  return {
+    algoritmo: nome,
+    posicoes,
+    comparacoes,
+    tempo_ms: +tempoMs.toFixed(4),
+    tamanho_texto: texto.length,
+    tamanho_padrao: padrao.length,
+    complexidade: cx,
+    tabelas_extras: tabelasExtras,
+    passos,
+    // guardamos texto e padrão para o visualizador
+    _texto: texto,
+    _padrao: padrao,
+  };
+}
+
+const BuscaNaive = {
+  nome: 'Naive',
+  complexidade: { melhor: 'O(n)', medio: 'O(n·m)', pior: 'O(n·m)' },
+
+  buscar(texto, padrao) {
+    const n = texto.length, m = padrao.length;
+    const posicoes = [], passos = [];
+    let comparacoes = 0, numPasso = 0;
+    const t0 = performance.now();
+
+    if (m === 0 || n === 0) return montarResultado(this.nome, this.complexidade, texto, padrao, [], 0, [], performance.now() - t0);
+
+    for (let inicio = 0; inicio <= n - m; inicio++) {
+      // Tenta casar o padrão inteiro a partir de 'inicio'
+      let j = 0;
+      while (j < m) {
+        comparacoes++;
+        const cTxt = texto[inicio + j];
+        const cPad = padrao[j];
+        const ok   = cTxt === cPad;
+
+        passos.push({
+          numero: numPasso++,
+          posicao_texto:  inicio + j,
+          posicao_padrao: j,
+          descricao: `texto[${inicio + j}]='${cTxt}' vs padrão[${j}]='${cPad}'`,
+          houve_match:    ok,
+          destaque_texto: range(inicio, inicio + m),
+          destaque_padrao: range(0, j + 1),
+          dados_extras: { inicio_janela: inicio },
+        });
+
+        if (!ok) break; // falhou → próxima janela
+        j++;
+      }
+      if (j === m) posicoes.push(inicio); // chegou até o fim → encontrou!
+    }
+
+    return montarResultado(this.nome, this.complexidade, texto, padrao, posicoes, comparacoes, passos, performance.now() - t0);
+  }
+};
+
+const BuscaRabinKarp = {
+  nome: 'Rabin-Karp',
+  complexidade: { melhor: 'O(n+m)', medio: 'O(n+m)', pior: 'O(n·m)' },
+  BASE: 256,
+  MOD: 101,
+
+  buscar(texto, padrao) {
+    const n = texto.length, m = padrao.length;
+    const B = this.BASE, MOD = this.MOD;
+    const posicoes = [], passos = [], hashes = [];
+    let comparacoes = 0, numPasso = 0;
+    const t0 = performance.now();
+
+    if (m === 0 || n === 0 || m > n) return montarResultado(this.nome, this.complexidade, texto, padrao, [], 0, [], performance.now() - t0);
+
+    // h = B^(m-1) mod MOD — usado para remover o primeiro char da janela
+    let h = 1;
+    for (let i = 0; i < m - 1; i++) h = (h * B) % MOD;
+
+    // Hash inicial do padrão e da primeira janela
+    let hashPad = 0, hashJan = 0;
+    for (let i = 0; i < m; i++) {
+      hashPad = (B * hashPad + padrao.charCodeAt(i)) % MOD;
+      hashJan = (B * hashJan + texto.charCodeAt(i))  % MOD;
+    }
+    hashes.push({ janela: 0, hash_texto: hashJan, hash_padrao: hashPad });
+
+    for (let i = 0; i <= n - m; i++) {
+      const iguais = hashJan === hashPad;
+      const info   = { hash_texto: hashJan, hash_padrao: hashPad, hashes_iguais: iguais, inicio_janela: i };
+
+      if (iguais) {
+        // Hashes iguais → confirma char a char
+        let j = 0;
+        while (j < m) {
+          comparacoes++;
+          const cTxt = texto[i + j], cPad = padrao[j], ok = cTxt === cPad;
+          passos.push({
+            numero: numPasso++,
+            posicao_texto:  i + j,
+            posicao_padrao: j,
+            descricao: `[Hash igual!] Confirmando: texto[${i+j}]='${cTxt}' vs padrão[${j}]='${cPad}'`,
+            houve_match:    ok,
+            destaque_texto: range(i, i + m),
+            destaque_padrao: range(0, j + 1),
+            dados_extras: info,
+          });
+          if (!ok) break;
+          j++;
+        }
+        if (j === m) posicoes.push(i);
+      } else {
+        // Hashes diferentes → pula sem verificar chars
+        passos.push({
+          numero: numPasso++,
+          posicao_texto:  i,
+          posicao_padrao: 0,
+          descricao: `Hash diferente na janela ${i}: texto=${hashJan} ≠ padrão=${hashPad} → pula`,
+          houve_match:    false,
+          destaque_texto: range(i, i + m),
+          destaque_padrao: [],
+          dados_extras: info,
+        });
+      }
+
+      // Atualiza o hash (rolling hash em O(1))
+      if (i < n - m) {
+        hashJan = (B * (hashJan - texto.charCodeAt(i) * h) + texto.charCodeAt(i + m)) % MOD;
+        if (hashJan < 0) hashJan += MOD;
+        hashes.push({ janela: i + 1, hash_texto: hashJan, hash_padrao: hashPad });
+      }
+    }
+
+    const tabelasExtras = { hashes, base: B, mod: MOD, hash_padrao: hashPad };
+    return montarResultado(this.nome, this.complexidade, texto, padrao, posicoes, comparacoes, passos, performance.now() - t0, tabelasExtras);
+  }
+};
+
+
+const BuscaKMP = {
+  nome: 'KMP',
+  complexidade: { melhor: 'O(n)', medio: 'O(n+m)', pior: 'O(n+m)' },
+
+  // Constrói a tabela LPS em O(m)
+  construirLPS(padrao) {
+    const m = padrao.length;
+    const lps = new Array(m).fill(0);
+    let comp = 0, i = 1; // comp = comprimento do prefixo atual
+
+    while (i < m) {
+      if (padrao[i] === padrao[comp]) {
+        lps[i++] = ++comp;          // extende o prefixo-sufixo
+      } else if (comp !== 0) {
+        comp = lps[comp - 1];       // tenta prefixo menor
+      } else {
+        lps[i++] = 0;               // nenhum prefixo possível
+      }
+    }
+    return lps;
+  },
+
+  buscar(texto, padrao) {
+    const n = texto.length, m = padrao.length;
+    const posicoes = [], passos = [];
+    let comparacoes = 0, numPasso = 0;
+    const t0 = performance.now();
+
+    if (m === 0 || n === 0) return montarResultado(this.nome, this.complexidade, texto, padrao, [], 0, [], performance.now() - t0);
+
+    const lps = this.construirLPS(padrao);
+    let i = 0, j = 0; // i = cursor no texto, j = cursor no padrão
+
+    while (i < n) {
+      comparacoes++;
+      const cTxt = texto[i], cPad = padrao[j], ok = cTxt === cPad;
+      const saltoLPS = (!ok && j > 0) ? lps[j - 1] : null;
+
+      passos.push({
+        numero: numPasso++,
+        posicao_texto:  i,
+        posicao_padrao: j,
+        descricao: `texto[${i}]='${cTxt}' vs padrão[${j}]='${cPad}' | LPS[${j}]=${lps[j]}`,
+        houve_match:    ok,
+        destaque_texto: [i],
+        destaque_padrao: [j],
+        dados_extras: { lps: lps.slice(), i, j, salto_lps: saltoLPS },
+      });
+
+      if (ok) {
+        i++; j++; // avança nos dois
+      } else {
+        j = (j !== 0) ? lps[j - 1] : 0; // salta pelo LPS
+        if (j === 0 && !ok) i++;         // nem o primeiro casou → avança no texto
+      }
+
+      if (j === m) {            // chegou ao fim do padrão → encontrou!
+        posicoes.push(i - j);
+        j = lps[j - 1];        // prepara para próxima ocorrência
+      }
+    }
+
+    const tabelasExtras = {
+      lps: lps.map((v, idx) => ({ indice: idx, char: padrao[idx], valor_lps: v }))
+    };
+    return montarResultado(this.nome, this.complexidade, texto, padrao, posicoes, comparacoes, passos, performance.now() - t0, tabelasExtras);
+  }
+};
+
+const BuscaBoyerMoore = {
+  nome: 'Boyer-Moore',
+  complexidade: { melhor: 'O(n/m)', medio: 'O(n)', pior: 'O(n·m)' },
+
+  // Tabela: char → último índice no padrão (-1 se ausente)
+  construirTabelaMC(padrao) {
+    const tabela = {};
+    for (let i = 0; i < padrao.length; i++) tabela[padrao[i]] = i;
+    return tabela; // chars ausentes → .get retorna -1
+  },
+
+  buscar(texto, padrao) {
+    const n = texto.length, m = padrao.length;
+    const posicoes = [], passos = [];
+    let comparacoes = 0, numPasso = 0;
+    const t0 = performance.now();
+
+    if (m === 0 || n === 0 || m > n) return montarResultado(this.nome, this.complexidade, texto, padrao, [], 0, [], performance.now() - t0);
+
+    const tmc = this.construirTabelaMC(padrao);
+    let d = 0; // deslocamento do padrão sobre o texto
+
+    while (d <= n - m) {
+      let j = m - 1; // começa comparando pelo fim do padrão
+
+      while (j >= 0) {
+        comparacoes++;
+        const cTxt = texto[d + j], cPad = padrao[j], ok = cTxt === cPad;
+        const imc  = (tmc[cTxt] !== undefined) ? tmc[cTxt] : -1;
+
+        passos.push({
+          numero: numPasso++,
+          posicao_texto:  d + j,
+          posicao_padrao: j,
+          descricao: `texto[${d+j}]='${cTxt}' vs padrão[${j}]='${cPad}' (direita→esquerda)`,
+          houve_match:    ok,
+          destaque_texto: range(d, d + m),
+          destaque_padrao: [j],
+          dados_extras: { deslocamento: d, indice_mc: imc, mau_caractere: cTxt },
+        });
+
+        if (!ok) break; // achou o mau caractere
+        j--;
+      }
+
+      if (j < 0) {
+        // j = -1 → casou tudo → encontrou!
+        posicoes.push(d);
+        const prox = (d + m < n && tmc[texto[d + m]] !== undefined) ? tmc[texto[d + m]] : -1;
+        d += m - prox;
+      } else {
+        // Aplica a heurística do mau caractere
+        const imc = (tmc[texto[d + j]] !== undefined) ? tmc[texto[d + j]] : -1;
+        d += Math.max(1, j - imc);
+      }
+    }
+
+    const tabelasExtras = {
+      mau_caractere: Object.entries(tmc).sort().map(([ch, idx]) => ({ char: ch, ultimo_indice: idx }))
+    };
+    return montarResultado(this.nome, this.complexidade, texto, padrao, posicoes, comparacoes, passos, performance.now() - t0, tabelasExtras);
+  }
+};
+
+// ── Registro de algoritmos ────────
+const ALGORITMOS = {
+  'naive':       BuscaNaive,
+  'rabin-karp':  BuscaRabinKarp,
+  'kmp':         BuscaKMP,
+  'boyer-moore': BuscaBoyerMoore,
+};
+
+// ── Utilitários ──────────────────────────────────────────────
+function range(a, b) { const r = []; for (let i = a; i < b; i++) r.push(i); return r; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/ /g,'&nbsp;'); }
+
+const COR = {
+  'naive':       'var(--cor-naive)',
+  'rabin-karp':  'var(--cor-rabinkarp)',
+  'kmp':         'var(--cor-kmp)',
+  'boyer-moore': 'var(--cor-boyermoore)',
+};
+const NOME = {
+  'naive':       'Busca Naive (Força Bruta)',
+  'rabin-karp':  'Rabin-Karp',
+  'kmp':         'Knuth-Morris-Pratt (KMP)',
+  'boyer-moore': 'Boyer-Moore',
+};
+
+const E = {
+  algoAtual:  'naive',
+  dadosPasso: null,
+  idx:        0,
+  timer:      null,
+  tocando:    false,
+};
+
+function getTxt() { return document.getElementById('input-txt').value; }
+function getPad() { return document.getElementById('input-pad').value; }
+
+function mostrarAba(nome) {
+  document.querySelectorAll('.aba').forEach(a => a.classList.toggle('ativa', a.dataset.aba === nome));
+  document.querySelectorAll('.painel').forEach(p => p.classList.toggle('ativo', p.id === 'painel-' + nome));
+}
+
+function setLoad(id, on) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.disabled = on;
+  b._orig = b._orig || b.innerHTML;
+  b.innerHTML = on ? '<span class="loader"></span>' : b._orig;
+}
+
+function criarCard(titulo, html) {
+  const d = document.createElement('div');
+  d.className = 'card surgir';
+  d.innerHTML = `<div class="sec-titulo" style="margin-bottom:.65rem">${titulo}</div>${html}`;
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UPLOAD
+// ══════════════════════════════════════════════════════════════
+document.getElementById('input-arq').addEventListener('change', async function() {
+  const fs = Array.from(this.files);
+  document.getElementById('input-txt').value = (await Promise.all(fs.map(f => f.text()))).join('\n');
+  document.getElementById('lista-arq').textContent = fs.map(f => '✓ ' + f.name).join('\n');
+  atuTam();
+});
+const zona = document.getElementById('zona-upload');
+zona.addEventListener('dragover', e => { e.preventDefault(); zona.style.borderColor='var(--acento)'; });
+zona.addEventListener('dragleave', () => zona.style.borderColor='');
+zona.addEventListener('drop', async e => {
+  e.preventDefault(); zona.style.borderColor='';
+  const fs = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.txt'));
+  document.getElementById('input-txt').value = (await Promise.all(fs.map(f => f.text()))).join('\n');
+  document.getElementById('lista-arq').textContent = fs.map(f => '✓ ' + f.name).join('\n');
+  atuTam();
+});
+function atuTam() {
+  document.getElementById('tam-txt').textContent = getTxt().length + ' caracteres';
+  document.getElementById('tam-pad').textContent = getPad().length + ' caracteres';
+}
+document.getElementById('input-txt').addEventListener('input', atuTam);
+document.getElementById('input-pad').addEventListener('input', atuTam);
+
+// ══════════════════════════════════════════════════════════════
+//  SELEÇÃO DE ALGORITMO
+// ══════════════════════════════════════════════════════════════
+document.getElementById('grade-algos').addEventListener('click', e => {
+  const c = e.target.closest('.card-algo');
+  if (!c) return;
+  document.querySelectorAll('.card-algo').forEach(x => x.classList.remove('sel'));
+  c.classList.add('sel');
+  E.algoAtual = c.dataset.algo;
+});
+document.querySelectorAll('.aba').forEach(a => a.addEventListener('click', () => mostrarAba(a.dataset.aba)));
+
+// ══════════════════════════════════════════════════════════════
+//  EXECUTAR BUSCA
+// ══════════════════════════════════════════════════════════════
+document.getElementById('btn-exec').addEventListener('click', () => {
+  const txt = getTxt(), pad = getPad();
+  if (!txt || !pad) return alert('Preencha o texto e o padrão antes de executar.');
+  setLoad('btn-exec', true);
+  // setTimeout 0 para deixar o loader renderizar antes do cálculo
+  setTimeout(() => {
+    try {
+      const r = ALGORITMOS[E.algoAtual].buscar(txt, pad);
+      renderRes(r);
+      renderTab(r);
+      mostrarAba('resultado');
+    } finally { setLoad('btn-exec', false); }
+  }, 0);
+});
+
+function renderRes(r) {
+  document.getElementById('vazio-res').style.display = 'none';
+  const el = document.getElementById('cont-res');
+  el.style.display = 'flex';
+  el.innerHTML = `
+    <div class="card surgir">
+      <div class="cab-card">
+        <span class="dot" style="background:${COR[E.algoAtual]}"></span>
+        <span class="titulo-card">${NOME[E.algoAtual]}</span>
+        <span class="badge-card" style="background:rgba(16, 185, 129,.12);color:var(--verde);border:1px solid rgba(16, 185, 129,.3)">
+          ${r.posicoes.length} ocorrência(s)
+        </span>
+      </div>
+      <div class="metricas">
+        <div class="metrica"><div class="val">${r.tempo_ms} ms</div><div class="rot">Tempo de execução</div></div>
+        <div class="metrica"><div class="val">${r.comparacoes.toLocaleString('pt-BR')}</div><div class="rot">Comparações</div></div>
+        <div class="metrica"><div class="val">${r.tamanho_texto.toLocaleString('pt-BR')}</div><div class="rot">n (texto)</div></div>
+        <div class="metrica"><div class="val">${r.tamanho_padrao}</div><div class="rot">m (padrão)</div></div>
+      </div>
+      <div class="sec-titulo">Posições encontradas</div>
+      <div class="posicoes">
+        ${r.posicoes.length
+          ? r.posicoes.map(p=>`<span class="chip">[${p}–${p+r.tamanho_padrao-1}]</span>`).join('')
+          : '<span class="sem-match">Nenhuma ocorrência encontrada.</span>'}
+      </div>
+      <div class="sec-titulo" style="margin-top:.7rem">Complexidade teórica</div>
+      <div class="linha-cx">
+        <span class="badge-cx">Melhor: <span>${r.complexidade.melhor}</span></span>
+        <span class="badge-cx">Médio: <span>${r.complexidade.medio}</span></span>
+        <span class="badge-cx">Pior: <span>${r.complexidade.pior}</span></span>
+      </div>
+    </div>
+    <div class="card surgir">
+      <div class="sec-titulo">Texto (primeiros 500 chars) — ocorrências em verde</div>
+      <div class="vis-txt">${visTexto(getTxt().slice(0,500), r.posicoes, r.tamanho_padrao)}</div>
+    </div>`;
+}
+
+function visTexto(txt, pos, m) {
+  const s = new Set(); pos.forEach(p => { for(let i=p;i<p+m;i++) s.add(i); });
+  return txt.split('').map((c,i)=>`<span class="ch ${s.has(i)?'encontrou':''}" title="[${i}]">${esc(c)}</span>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PASSO A PASSO
+// ══════════════════════════════════════════════════════════════
+document.getElementById('btn-passo').addEventListener('click', () => {
+  const txt = getTxt(), pad = getPad();
+  if (!txt || !pad) return alert('Preencha o texto e o padrão antes de continuar.');
+  pararRep();
+  setLoad('btn-passo', true);
+  setTimeout(() => {
+    try {
+      const r = ALGORITMOS[E.algoAtual].buscar(txt, pad);
+      E.dadosPasso = r; E.idx = 0;
+      iniciarPasso(r);
+      mostrarAba('passos');
+    } finally { setLoad('btn-passo', false); }
+  }, 0);
+});
+
+function iniciarPasso(r) {
+  document.getElementById('vazio-pas').style.display    = 'none';
+  document.getElementById('cont-pas').style.display     = 'flex';
+  document.getElementById('dot-pas').style.background   = COR[E.algoAtual];
+  document.getElementById('nome-pas').textContent        = NOME[E.algoAtual];
+  const sl = document.getElementById('slider');
+  sl.max = Math.max(0, r.passos.length - 1);
+  sl.value = 0;
+  renderPasso(0);
+}
+
+function renderPasso(idx) {
+  const r = E.dadosPasso;
+  if (!r) return;
+  const p = r.passos[idx] || null;
+  E.idx = idx;
+
+  document.getElementById('slider').value = idx;
+  document.getElementById('cnt-pas').textContent =
+    `Passo ${idx+1} de ${r.passos.length}  ·  ${r.comparacoes} comparações total`;
+
+  // ── Texto ──
+  const matchSet = new Set();
+  r.posicoes.forEach(pos => { for(let i=pos;i<pos+r.tamanho_padrao;i++) matchSet.add(i); });
+
+  document.getElementById('vis-txt').innerHTML =
+    r._texto.slice(0,600).split('').map((c,i) => {
+      let cl = '';
+      if (p) {
+        if (p.destaque_texto.includes(i) && !matchSet.has(i)) cl = 'janela';
+        if (matchSet.has(i)) cl = 'encontrou';
+        if (i === p.posicao_texto) cl = p.houve_match ? 'encontrou' : 'falhou';
+      }
+      return `<span class="ch ${cl}" title="[${i}]">${esc(c)}</span>`;
+    }).join('');
+
+  // ── Padrão ──
+  document.getElementById('vis-pad').innerHTML =
+    r._padrao.split('').map((c,i) => {
+      let cl = '';
+      if (p && p.destaque_padrao.includes(i)) {
+        cl = (i === p.posicao_padrao) ? (p.houve_match ? 'encontrou' : 'falhou') : 'encontrou';
+      }
+      return `<span class="cp ${cl}" title="[${i}]">${esc(c)}</span>`;
+    }).join('');
+
+  // ── Log ──
+  const logEl = document.getElementById('log-pas');
+  const rec   = r.passos.slice(Math.max(0, idx-8), idx+1);
+  logEl.innerHTML = rec.map((s, ri) => {
+    const atual = ri === rec.length - 1;
+    const cl    = atual ? (s.houve_match ? 'ok' : 'fail') : 'info';
+    return `<div class="log-linha ${cl}"><span class="num-p">${s.numero+1}</span><span>${esc(s.descricao)}</span></div>`;
+  }).join('');
+  logEl.scrollTop = logEl.scrollHeight;
+
+  // ── Métricas parciais ──
+  const matchAte = r.posicoes.filter(pos => p && (pos + r.tamanho_padrao - 1) <= p.posicao_texto).length;
+  document.getElementById('met-pas').innerHTML = `
+    <div class="metrica"><div class="val">${idx+1}</div><div class="rot">Comparações até aqui</div></div>
+    <div class="metrica"><div class="val">${matchAte}</div><div class="rot">Ocorrências parciais</div></div>
+    <div class="metrica"><div class="val">${p ? p.posicao_texto : '-'}</div><div class="rot">Posição no texto</div></div>
+    <div class="metrica"><div class="val">${p ? p.posicao_padrao : '-'}</div><div class="rot">Posição no padrão</div></div>`;
+}
+
+// Controles
+document.getElementById('btn-ant').addEventListener('click', () => { pararRep(); if(E.idx>0) renderPasso(E.idx-1); });
+document.getElementById('btn-prox').addEventListener('click', () => {
+  pararRep();
+  const max = (E.dadosPasso?.passos.length||1)-1;
+  if(E.idx<max) renderPasso(E.idx+1);
+});
+document.getElementById('slider').addEventListener('input', e => { pararRep(); renderPasso(+e.target.value); });
+document.getElementById('btn-rep').addEventListener('click', () => {
+  if (E.tocando) { pararRep(); return; }
+  E.tocando = true;
+  document.getElementById('btn-rep').textContent = '⏸ Pausar';
+  const max = (E.dadosPasso?.passos.length||1)-1;
+  E.timer = setInterval(() => {
+    if (E.idx >= max) { pararRep(); return; }
+    renderPasso(E.idx+1);
+  }, 200);
+});
+function pararRep() {
+  clearInterval(E.timer); E.tocando = false;
+  const b = document.getElementById('btn-rep');
+  if (b) b.textContent = '▶ Auto';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TABELAS INTERNAS
+// ══════════════════════════════════════════════════════════════
+function renderTab(r) {
+  const tab = r.tabelas_extras || {};
+  const vazio = document.getElementById('vazio-tab');
+  const cont  = document.getElementById('cont-tab');
+  if (!Object.keys(tab).length) { vazio.style.display='flex'; cont.style.display='none'; return; }
+  vazio.style.display='none'; cont.style.display='flex'; cont.innerHTML='';
+
+  // KMP: tabela LPS
+  if (tab.lps) {
+    cont.appendChild(criarCard('Tabela LPS — Knuth-Morris-Pratt', `
+      <p style="font-size:.73rem;color:var(--muted);margin-bottom:.7rem;line-height:1.6">
+        <strong>O que é:</strong> LPS[i] = tamanho do maior prefixo de <code>padrão[0..i]</code> que também é sufixo.<br>
+        <strong>Para que serve:</strong> Ao falhar em <em>j</em>, salta para LPS[j-1] — o cursor do texto nunca retrocede!
+      </p>
+      <table class="tbl"><thead><tr><th>Índice</th><th>Char</th><th>LPS[i]</th><th>Significado</th></tr></thead>
+      <tbody>${tab.lps.map(row=>`<tr>
+        <td>${row.indice}</td>
+        <td style="color:var(--acento);font-weight:700">${esc(row.char)}</td>
+        <td style="color:var(--verde);font-weight:700">${row.valor_lps}</td>
+        <td style="color:var(--muted);font-size:.66rem">${row.valor_lps===0?'Nenhum prefixo-sufixo':`Prefixo de tamanho ${row.valor_lps} é também sufixo`}</td>
+      </tr>`).join('')}</tbody></table>`));
+  }
+
+  // Boyer-Moore: tabela mau caractere
+  if (tab.mau_caractere) {
+    cont.appendChild(criarCard('Tabela do Mau Caractere — Boyer-Moore', `
+      <p style="font-size:.73rem;color:var(--muted);margin-bottom:.7rem;line-height:1.6">
+        <strong>O que é:</strong> Índice da última ocorrência de cada char no padrão. Ausentes = -1 (pula o padrão inteiro!).<br>
+        <strong>Para que serve:</strong> Ao falhar, alinha o padrão com a última ocorrência do mau caractere.
+      </p>
+      <table class="tbl"><thead><tr><th>Caractere</th><th>Último índice</th><th>Efeito</th></tr></thead>
+      <tbody>${tab.mau_caractere.map(row=>`<tr>
+        <td style="color:var(--acento);font-weight:700">'${esc(row.char)}'</td>
+        <td style="color:var(--amarelo);font-weight:700">${row.ultimo_indice}</td>
+        <td style="color:var(--muted);font-size:.66rem">Alinha até índice ${row.ultimo_indice}</td>
+      </tr>`).join('')}</tbody></table>`));
+  }
+
+  // Rabin-Karp: hashes
+  if (tab.hashes) {
+    const ex = tab.hashes.slice(0,30);
+    cont.appendChild(criarCard('Hashes Calculados por Janela — Rabin-Karp', `
+      <p style="font-size:.73rem;color:var(--muted);margin-bottom:.7rem;line-height:1.6">
+        <strong>BASE=${tab.base} · MOD=${tab.mod}</strong> · Hash do padrão: <span style="color:var(--acento);font-weight:700">${tab.hash_padrao}</span><br>
+        Hash diferente → pula a janela. Hash igual → verifica char a char.
+      </p>
+      <table class="tbl"><thead><tr><th>Janela</th><th>Hash texto</th><th>Hash padrão</th><th>Candidato?</th></tr></thead>
+      <tbody>${ex.map(h=>`<tr>
+        <td>${h.janela}</td>
+        <td style="color:var(--ciano);font-weight:700">${h.hash_texto}</td>
+        <td style="color:var(--acento);font-weight:700">${h.hash_padrao}</td>
+        <td style="color:${h.hash_texto===h.hash_padrao?'var(--verde)':'var(--vermelho)'};font-weight:700">
+          ${h.hash_texto===h.hash_padrao?'✓ Verificar':'✗ Pular'}
+        </td>
+      </tr>`).join('')}</tbody></table>
+      ${tab.hashes.length>30?`<p style="font-size:.62rem;color:var(--muted);margin-top:.45rem">… e mais ${tab.hashes.length-30} janelas</p>`:''}`));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  COMPARAÇÃO
+// ══════════════════════════════════════════════════════════════
+document.getElementById('btn-cmp').addEventListener('click', () => {
+  const txt = getTxt(), pad = getPad();
+  if (!txt || !pad) return alert('Preencha o texto e o padrão antes de comparar.');
+  setLoad('btn-cmp', true);
+  setTimeout(() => {
+    try {
+      const resultados = Object.values(ALGORITMOS).map(a => a.buscar(txt, pad));
+      renderCmp(resultados);
+      mostrarAba('comparacao');
+    } finally { setLoad('btn-cmp', false); }
+  }, 0);
+});
+
+function renderCmp(resultados) {
+  document.getElementById('vazio-cmp').style.display = 'none';
+  const el = document.getElementById('cont-cmp');
+  el.style.display = 'flex';
+
+  const chaves = ['naive','rabin-karp','kmp','boyer-moore'];
+  const porChave = {};
+  resultados.forEach((r,i) => { porChave[chaves[i]] = r; });
+
+  const maxTempo = Math.max(...resultados.map(r=>r.tempo_ms)) || 1;
+  const maxCmp   = Math.max(...resultados.map(r=>r.comparacoes)) || 1;
+  const minTempo = Math.min(...resultados.map(r=>r.tempo_ms));
+
+  el.innerHTML = `<div class="grade-cmp">
+
+    <div class="card-cmp surgir">
+      <div class="titulo-cmp">⏱ Tempo de execução (ms)</div>
+      <div class="barras">${chaves.map(k => {
+        const r = porChave[k], pct = Math.max(2, r.tempo_ms/maxTempo*100);
+        return `<div class="linha-barra">
+          <span class="lbl-barra">${r.algoritmo}</span>
+          <div class="trilha"><div class="preench" style="width:${pct}%;background:${COR[k]}">
+            <span class="val-barra">${r.tempo_ms} ms</span>
+          </div></div></div>`;
+      }).join('')}</div>
+    </div>
+
+    <div class="card-cmp surgir">
+      <div class="titulo-cmp">🔢 Comparações realizadas</div>
+      <div class="barras">${chaves.map(k => {
+        const r = porChave[k], pct = Math.max(2, r.comparacoes/maxCmp*100);
+        return `<div class="linha-barra">
+          <span class="lbl-barra">${r.algoritmo}</span>
+          <div class="trilha"><div class="preench" style="width:${pct}%;background:${COR[k]}">
+            <span class="val-barra">${r.comparacoes.toLocaleString('pt-BR')}</span>
+          </div></div></div>`;
+      }).join('')}</div>
+    </div>
+
+    <div class="card-cmp surgir" style="grid-column:1/-1">
+      <div class="titulo-cmp">📋 Tabela comparativa</div>
+      <table class="tbl"><thead>
+        <tr><th>Algoritmo</th><th>Tempo (ms)</th><th>Comparações</th><th>Ocorrências</th><th>Melhor</th><th>Médio</th><th>Pior</th></tr>
+      </thead><tbody>
+        ${chaves.map(k => {
+          const r = porChave[k], ok = r.tempo_ms === minTempo;
+          return `<tr>
+            <td style="color:${COR[k]};font-weight:700">${r.algoritmo}</td>
+            <td style="${ok?'color:var(--verde);font-weight:700':''}">${r.tempo_ms} ms ${ok?'🏆':''}</td>
+            <td>${r.comparacoes.toLocaleString('pt-BR')}</td>
+            <td style="color:var(--verde)">${r.posicoes.length}</td>
+            <td style="color:var(--ciano);font-family:var(--mono);font-size:.67rem">${r.complexidade.melhor}</td>
+            <td style="color:var(--amarelo);font-family:var(--mono);font-size:.67rem">${r.complexidade.medio}</td>
+            <td style="color:var(--vermelho);font-family:var(--mono);font-size:.67rem">${r.complexidade.pior}</td>
+          </tr>`;
+        }).join('')}
+      </tbody></table>
+    </div>
+
+    <div class="card-cmp surgir" style="grid-column:1/-1">
+      <div class="titulo-cmp">📚 Quando usar cada algoritmo?</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem">
+        ${[
+          {k:'naive',    i:'🔨', t:'Simples de entender e implementar. Ideal para textos pequenos ou fins didáticos. Sem pré-processamento.'},
+          {k:'rabin-karp', i:'#️⃣', t:'Ótimo para múltiplos padrões. O rolling hash descarta janelas em O(1) sem comparar char a char.'},
+          {k:'kmp',        i:'🚀', t:'Excelente com repetições (DNA, logs). A tabela LPS garante que o cursor do texto nunca retrocede.'},
+          {k:'boyer-moore',i:'⚡', t:'O mais rápido na prática para textos longos. Salta grandes trechos comparando da direita para a esquerda.'},
+        ].map(({k,i,t}) => `
+          <div style="background:var(--superficie2);border:1px solid var(--borda);border-radius:8px;padding:.7rem">
+            <div style="color:${COR[k]};font-weight:700;margin-bottom:.28rem">${i} ${porChave[k].algoritmo}</div>
+            <div style="font-size:.7rem;color:var(--muted);line-height:1.55">${t}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+  </div>`;
+
+  // Anima as barras
+  setTimeout(() => {
+    document.querySelectorAll('.preench').forEach(b => {
+      const w = b.style.width; b.style.width='0';
+      setTimeout(()=>b.style.width=w, 40);
+    });
+  }, 40);
+}
+</script>
+</body>
+</html>
