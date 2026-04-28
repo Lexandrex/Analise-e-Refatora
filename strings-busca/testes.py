@@ -14,11 +14,11 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from algoritmos import BuscaIngenua, BuscaRabinKarp, BuscaKMP, BuscaBoyerMoore
+from algoritmos import BuscaNaive, BuscaRabinKarp, BuscaKMP, BuscaBoyerMoore
 
 # Lista de algoritmos a testar
 ALGORITMOS = [
-    BuscaIngenua(),
+    BuscaNaive(),
     BuscaRabinKarp(),
     BuscaKMP(),
     BuscaBoyerMoore(),
