@@ -45,6 +45,44 @@ class EstrategiaDeBusca(ABC):
         """Executa a busca e retorna o resultado completo."""
         ...
 
+    # ─── Métodos auxiliares para evitar repetição ───
+
+    def _iniciar_tempo(self) -> float:
+        """Inicia a medição de tempo. Retorna timestamp inicial."""
+        return time.perf_counter()
+
+    def _finalizar_tempo(self, inicio: float) -> float:
+        """Finaliza a medição e retorna o tempo em ms."""
+        return (time.perf_counter() - inicio) * 1000
+
+    def _criar_passo(
+        self,
+        numero_passo: int,
+        posicao_texto: int,
+        posicao_padrao: int,
+        descricao: str,
+        houve_match: bool,
+        destaque_texto: List[int],
+        destaque_padrao: List[int],
+        dados_extras: Dict[str, Any] = None,
+    ) -> PassoExecucao:
+        """Factory method para criar um PassoExecucao padronizado."""
+        return PassoExecucao(
+            numero_passo=numero_passo,
+            posicao_texto=posicao_texto,
+            posicao_padrao=posicao_padrao,
+            descricao=descricao,
+            houve_match=houve_match,
+            destaque_texto=destaque_texto,
+            destaque_padrao=destaque_padrao,
+            dados_extras=dados_extras or {},
+        )
+
+    def _caso_vazio(self, texto: str, padrao: str, inicio: float) -> ResultadoBusca:
+        """Retorna resultado vazio para texto ou padrão vazio."""
+        tempo = self._finalizar_tempo(inicio)
+        return self._montar_resultado(texto, padrao, [], 0, [], tempo)
+
     def _montar_resultado(self, texto, padrao, posicoes, comparacoes,
                             passos, tempo_ms, tabelas_extras=None) -> ResultadoBusca:
         """Método auxiliar para montar o ResultadoBusca de forma padronizada."""
@@ -79,12 +117,11 @@ class BuscaNaive(EstrategiaDeBusca):
         comparacoes = 0
         numero_passo = 0
 
-        inicio = time.perf_counter()
+        inicio = self._iniciar_tempo()
 
         # Caso especial: texto ou padrão vazio → nada a buscar
         if m == 0 or n == 0:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
+            return self._caso_vazio(texto, padrao, inicio)
 
         # Para cada posição possível de início no texto...
         for inicio_janela in range(n - m + 1):
@@ -97,7 +134,7 @@ class BuscaNaive(EstrategiaDeBusca):
                 char_padrao = padrao[j]
                 houve_match = (char_texto == char_padrao)
 
-                passos.append(PassoExecucao(
+                passos.append(self._criar_passo(
                     numero_passo=numero_passo,
                     posicao_texto=inicio_janela + j,
                     posicao_padrao=j,
@@ -116,7 +153,7 @@ class BuscaNaive(EstrategiaDeBusca):
             if j == m:
                 posicoes.append(inicio_janela)  # chegou até o fim → encontrou!
 
-        tempo = (time.perf_counter() - inicio) * 1000
+        tempo = self._finalizar_tempo(inicio)
         return self._montar_resultado(texto, padrao, posicoes, comparacoes, passos, tempo)
 
 
@@ -139,11 +176,10 @@ class BuscaRabinKarp(EstrategiaDeBusca):
         numero_passo = 0
         registro_hashes = []  # para exibir na aba "Tabelas Internas"
 
-        inicio = time.perf_counter()
+        inicio = self._iniciar_tempo()
 
         if m == 0 or n == 0 or m > n:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
+            return self._caso_vazio(texto, padrao, inicio)
 
         B = self.BASE
         MOD = self.MOD
@@ -179,7 +215,7 @@ class BuscaRabinKarp(EstrategiaDeBusca):
                     char_padrao = padrao[j]
                     houve_match = (char_texto == char_padrao)
 
-                    passos.append(PassoExecucao(
+                    passos.append(self._criar_passo(
                         numero_passo=numero_passo,
                         posicao_texto=i + j,
                         posicao_padrao=j,
@@ -197,7 +233,7 @@ class BuscaRabinKarp(EstrategiaDeBusca):
                     posicoes.append(i)  # todos os chars batem → encontrou!
             else:
                 # Hashes diferentes → podemos pular sem verificar os chars
-                passos.append(PassoExecucao(
+                passos.append(self._criar_passo(
                     numero_passo=numero_passo,
                     posicao_texto=i,
                     posicao_padrao=0,
@@ -216,7 +252,7 @@ class BuscaRabinKarp(EstrategiaDeBusca):
                     hash_janela += MOD
                 registro_hashes.append({"janela": i + 1, "hash_texto": hash_janela, "hash_padrao": hash_padrao})
 
-        tempo = (time.perf_counter() - inicio) * 1000
+        tempo = self._finalizar_tempo(inicio)
         tabelas = {
             "hashes": registro_hashes,
             "base": B,
@@ -269,11 +305,10 @@ class BuscaKMP(EstrategiaDeBusca):
         comparacoes = 0
         numero_passo = 0
 
-        inicio = time.perf_counter()
+        inicio = self._iniciar_tempo()
 
         if m == 0 or n == 0:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
+            return self._caso_vazio(texto, padrao, inicio)
 
         lps = self._construir_tabela_lps(padrao)
 
@@ -289,7 +324,7 @@ class BuscaKMP(EstrategiaDeBusca):
             # Calcula o salto que faríamos se falhar aqui
             salto_lps = lps[j - 1] if (not houve_match and j > 0) else None
 
-            passos.append(PassoExecucao(
+            passos.append(self._criar_passo(
                 numero_passo=numero_passo,
                 posicao_texto=i,
                 posicao_padrao=j,
@@ -316,7 +351,7 @@ class BuscaKMP(EstrategiaDeBusca):
                 posicoes.append(i - j)
                 j = lps[j - 1]  # prepara para buscar a próxima ocorrência
 
-        tempo = (time.perf_counter() - inicio) * 1000
+        tempo = self._finalizar_tempo(inicio)
         tabelas = {
             "lps": [
                 {"indice": idx, "char": padrao[idx], "valor_lps": lps[idx]}
@@ -351,11 +386,10 @@ class BuscaBoyerMoore(EstrategiaDeBusca):
         comparacoes = 0
         numero_passo = 0
 
-        inicio = time.perf_counter()
+        inicio = self._iniciar_tempo()
 
         if m == 0 or n == 0 or m > n:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
+            return self._caso_vazio(texto, padrao, inicio)
 
         tabela_mc = self._construir_tabela_mau_caractere(padrao)
 
@@ -376,7 +410,7 @@ class BuscaBoyerMoore(EstrategiaDeBusca):
                 indice_mc = tabela_mc.get(char_texto, -1)
                 salto = max(1, j - indice_mc) if not houve_match else 0
 
-                passos.append(PassoExecucao(
+                passos.append(self._criar_passo(
                     numero_passo=numero_passo,
                     posicao_texto=deslocamento + j,
                     posicao_padrao=j,
@@ -410,7 +444,7 @@ class BuscaBoyerMoore(EstrategiaDeBusca):
                 indice_mc = tabela_mc.get(texto[deslocamento + j], -1)
                 deslocamento += max(1, j - indice_mc)
 
-        tempo = (time.perf_counter() - inicio) * 1000
+        tempo = self._finalizar_tempo(inicio)
         tabelas = {
             "mau_caractere": [
                 {"char": char, "ultimo_indice": idx}
