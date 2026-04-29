@@ -1,53 +1,99 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import time
 
-#  ESTRUTURAS DE DADOS
 @dataclass
 class PassoExecucao:
-
-    numero_passo: int           # número sequencial do passo (0, 1, 2...)
-    posicao_texto: int          # índice atual no texto
-    posicao_padrao: int         # índice atual no padrão
-    descricao: str              # texto legível: "texto[3]='a' vs padrão[0]='a'"
-    houve_match: bool           # True se os caracteres são iguais
-    destaque_texto: List[int] = field(default_factory=list)   # posições de destaque no texto
-    destaque_padrao: List[int] = field(default_factory=list)  # posições de destaque no padrão
-    dados_extras: Dict[str, Any] = field(default_factory=dict) # info específica do algoritmo
+    numero_passo: int
+    posicao_texto: int
+    posicao_padrao: int
+    descricao: str
+    houve_match: bool
+    destaque_texto: List[int] = field(default_factory=list)
+    destaque_padrao: List[int] = field(default_factory=list)
+    dados_extras: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ResultadoBusca:
-
-    algoritmo: str              # nome do algoritmo usado
-    texto: str                  # texto onde buscamos
-    padrao: str                 # padrão que buscamos
-    posicoes: List[int]         # onde o padrão foi encontrado
-    comparacoes: int            # total de comparações feitas
-    passos: List[PassoExecucao] # rastreamento completo do algoritmo
-    tempo_ms: float             # tempo de execução em milissegundos
-    tabelas_extras: Dict[str, Any] = field(default_factory=dict)  # LPS, mau-char, hashes
+    algoritmo: str
+    texto: str
+    padrao: str
+    posicoes: List[int]
+    comparacoes: int
+    passos: List[PassoExecucao]
+    tempo_ms: float
+    tabelas_extras: Dict[str, Any] = field(default_factory=dict)
     complexidade_melhor: str = ""
     complexidade_media: str = ""
     complexidade_pior: str = ""
 
+class LoggerExecucao:
+    def __init__(self):
+        self.passos: List[PassoExecucao] = []
+        self.numero_passo = 0
+        self.comparacoes = 0
 
-#  INTERFACE (STRATEGY)
+    def registrar(self, pos_texto, pos_padrao, descricao, match,
+                  destaque_texto=None, destaque_padrao=None, extras=None):
+
+        self.comparacoes += 1
+
+        self.passos.append(PassoExecucao(
+            numero_passo=self.numero_passo,
+            posicao_texto=pos_texto,
+            posicao_padrao=pos_padrao,
+            descricao=descricao,
+            houve_match=match,
+            destaque_texto=destaque_texto or [],
+            destaque_padrao=destaque_padrao or [],
+            dados_extras=extras or {}
+        ))
+
+        self.numero_passo += 1
+
 class EstrategiaDeBusca(ABC):
     nome: str = "Abstrato"
     complexidade_melhor: str = ""
     complexidade_media: str = ""
     complexidade_pior: str = ""
 
-    @abstractmethod
     def buscar(self, texto: str, padrao: str) -> ResultadoBusca:
-        """Executa a busca e retorna o resultado completo."""
-        ...
+        inicio = time.perf_counter()
+
+        if self._entrada_invalida(texto, padrao):
+            return self._resultado_vazio(texto, padrao, inicio)
+
+        logger = LoggerExecucao()
+
+        posicoes, tabelas = self._executar(texto, padrao, logger)
+
+        tempo = (time.perf_counter() - inicio) * 1000
+
+        return self._montar_resultado(
+            texto,
+            padrao,
+            posicoes,
+            logger.comparacoes,
+            logger.passos,
+            tempo,
+            tabelas
+        )
+
+    @abstractmethod
+    def _executar(self, texto: str, padrao: str, logger: LoggerExecucao) -> Tuple[List[int], Dict]:
+        pass
+
+    def _entrada_invalida(self, texto, padrao):
+        return len(texto) == 0 or len(padrao) == 0 or len(padrao) > len(texto)
+
+    def _resultado_vazio(self, texto, padrao, inicio):
+        tempo = (time.perf_counter() - inicio) * 1000
+        return self._montar_resultado(texto, padrao, [], 0, [], tempo)
 
     def _montar_resultado(self, texto, padrao, posicoes, comparacoes,
-                            passos, tempo_ms, tabelas_extras=None) -> ResultadoBusca:
-        """Método auxiliar para montar o ResultadoBusca de forma padronizada."""
+                          passos, tempo_ms, tabelas_extras=None) -> ResultadoBusca:
         return ResultadoBusca(
             algoritmo=self.nome,
             texto=texto,
@@ -62,359 +108,187 @@ class EstrategiaDeBusca(ABC):
             complexidade_pior=self.complexidade_pior,
         )
 
-
-
-#  ALGORITMO 1: BUSCA NAIVE (FORÇA BRUTA)
 class BuscaNaive(EstrategiaDeBusca):
     nome = "Naive"
     complexidade_melhor = "O(n)"
     complexidade_media = "O(n·m)"
     complexidade_pior = "O(n·m)"
 
-    def buscar(self, texto: str, padrao: str) -> ResultadoBusca:
-        n = len(texto)
-        m = len(padrao)
+    def _executar(self, texto, padrao, logger):
+        n, m = len(texto), len(padrao)
         posicoes = []
-        passos = []
-        comparacoes = 0
-        numero_passo = 0
 
-        inicio = time.perf_counter()
+        for i in range(n - m + 1):
+            if self._comparar_janela(texto, padrao, i, logger):
+                posicoes.append(i)
 
-        # Caso especial: texto ou padrão vazio → nada a buscar
-        if m == 0 or n == 0:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
+        return posicoes, {}
 
-        # Para cada posição possível de início no texto...
-        for inicio_janela in range(n - m + 1):
+    def _comparar_janela(self, texto, padrao, inicio, logger):
+        m = len(padrao)
 
-            # ...tenta casar o padrão inteiro a partir daqui
-            j = 0
-            while j < m:
-                comparacoes += 1
-                char_texto = texto[inicio_janela + j]
-                char_padrao = padrao[j]
-                houve_match = (char_texto == char_padrao)
+        for j in range(m):
+            t = texto[inicio + j]
+            p = padrao[j]
+            match = t == p
 
-                passos.append(PassoExecucao(
-                    numero_passo=numero_passo,
-                    posicao_texto=inicio_janela + j,
-                    posicao_padrao=j,
-                    descricao=f"texto[{inicio_janela + j}]='{char_texto}' vs padrão[{j}]='{char_padrao}'",
-                    houve_match=houve_match,
-                    destaque_texto=list(range(inicio_janela, inicio_janela + m)),
-                    destaque_padrao=list(range(j + 1)),
-                    dados_extras={"inicio_janela": inicio_janela},
-                ))
-                numero_passo += 1
+            logger.registrar(
+                inicio + j,
+                j,
+                f"texto[{inicio+j}]='{t}' vs padrão[{j}]='{p}'",
+                match,
+                destaque_texto=list(range(inicio, inicio + m)),
+                destaque_padrao=list(range(j + 1)),
+                extras={"inicio_janela": inicio}
+            )
 
-                if not houve_match:
-                    break  # falhou → tenta próxima janela
-                j += 1
+            if not match:
+                return False
 
-            if j == m:
-                posicoes.append(inicio_janela)  # chegou até o fim → encontrou!
+        return True
 
-        tempo = (time.perf_counter() - inicio) * 1000
-        return self._montar_resultado(texto, padrao, posicoes, comparacoes, passos, tempo)
-
-
-#  ALGORITMO 2: RABIN-KARP
 class BuscaRabinKarp(EstrategiaDeBusca):
     nome = "Rabin-Karp"
     complexidade_melhor = "O(n+m)"
     complexidade_media = "O(n+m)"
     complexidade_pior = "O(n·m)"
 
-    BASE = 256  # base do sistema posicional (tamanho do alfabeto)
-    MOD  = 101  # módulo primo para manter o hash pequeno
+    BASE = 256
+    MOD = 101
 
-    def buscar(self, texto: str, padrao: str) -> ResultadoBusca:
-        n = len(texto)
-        m = len(padrao)
+    def _executar(self, texto, padrao, logger):
+        n, m = len(texto), len(padrao)
         posicoes = []
-        passos = []
-        comparacoes = 0
-        numero_passo = 0
-        registro_hashes = []  # para exibir na aba "Tabelas Internas"
+        hashes = []
 
-        inicio = time.perf_counter()
+        B, MOD = self.BASE, self.MOD
 
-        if m == 0 or n == 0 or m > n:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
-
-        B = self.BASE
-        MOD = self.MOD
-
-        # h = B^(m-1) mod MOD → usado para remover o primeiro caractere da janela
         h = pow(B, m - 1, MOD)
 
-        # Calcula o hash inicial do padrão e da primeira janela do texto
-        hash_padrao = 0
-        hash_janela = 0
+        hash_p = 0
+        hash_t = 0
+
         for i in range(m):
-            hash_padrao = (B * hash_padrao + ord(padrao[i])) % MOD
-            hash_janela = (B * hash_janela + ord(texto[i])) % MOD
+            hash_p = (B * hash_p + ord(padrao[i])) % MOD
+            hash_t = (B * hash_t + ord(texto[i])) % MOD
 
-        registro_hashes.append({"janela": 0, "hash_texto": hash_janela, "hash_padrao": hash_padrao})
-
-        # Desliza a janela pelo texto
         for i in range(n - m + 1):
-            hashes_iguais = (hash_janela == hash_padrao)
 
-            info_extra = {
-                "hash_texto": hash_janela,
-                "hash_padrao": hash_padrao,
-                "hashes_iguais": hashes_iguais,
-                "inicio_janela": i,
-            }
-
-            if hashes_iguais:
-                # Hashes batem → verifica caractere a caractere para confirmar
-                for j in range(m):
-                    comparacoes += 1
-                    char_texto = texto[i + j]
-                    char_padrao = padrao[j]
-                    houve_match = (char_texto == char_padrao)
-
-                    passos.append(PassoExecucao(
-                        numero_passo=numero_passo,
-                        posicao_texto=i + j,
-                        posicao_padrao=j,
-                        descricao=f"[Hash igual!] Confirmando: texto[{i+j}]='{char_texto}' vs padrão[{j}]='{char_padrao}'",
-                        houve_match=houve_match,
-                        destaque_texto=list(range(i, i + m)),
-                        destaque_padrao=list(range(j + 1)),
-                        dados_extras=info_extra,
-                    ))
-                    numero_passo += 1
-
-                    if not houve_match:
-                        break  # foi uma colisão de hash → falso positivo
-                else:
-                    posicoes.append(i)  # todos os chars batem → encontrou!
+            if hash_p == hash_t:
+                if self._confirmar(texto, padrao, i, logger):
+                    posicoes.append(i)
             else:
-                # Hashes diferentes → podemos pular sem verificar os chars
-                passos.append(PassoExecucao(
-                    numero_passo=numero_passo,
-                    posicao_texto=i,
-                    posicao_padrao=0,
-                    descricao=f"Hash diferente na janela {i}: texto={hash_janela} ≠ padrão={hash_padrao} → pula",
-                    houve_match=False,
+                logger.registrar(
+                    i, 0,
+                    f"Hash diferente → pula",
+                    False,
                     destaque_texto=list(range(i, i + m)),
-                    destaque_padrao=[],
-                    dados_extras=info_extra,
-                ))
-                numero_passo += 1
+                    extras={"hash_texto": hash_t, "hash_padrao": hash_p}
+                )
 
-            # Atualiza o hash para a próxima janela (rolling hash em O(1))
             if i < n - m:
-                hash_janela = (B * (hash_janela - ord(texto[i]) * h) + ord(texto[i + m])) % MOD
-                if hash_janela < 0:
-                    hash_janela += MOD
-                registro_hashes.append({"janela": i + 1, "hash_texto": hash_janela, "hash_padrao": hash_padrao})
+                hash_t = (B * (hash_t - ord(texto[i]) * h) + ord(texto[i + m])) % MOD
 
-        tempo = (time.perf_counter() - inicio) * 1000
-        tabelas = {
-            "hashes": registro_hashes,
-            "base": B,
-            "mod": MOD,
-            "hash_padrao": hash_padrao,
-        }
-        return self._montar_resultado(texto, padrao, posicoes, comparacoes, passos, tempo, tabelas)
+            hashes.append(hash_t)
 
+        return posicoes, {"hashes": hashes}
 
-#  ALGORITMO 3: KNUTH-MORRIS-PRATT (KMP)
+    def _confirmar(self, texto, padrao, inicio, logger):
+        for j in range(len(padrao)):
+            t = texto[inicio + j]
+            p = padrao[j]
+            match = t == p
+
+            logger.registrar(
+                inicio + j, j,
+                f"[Confirmando] {t} == {p}",
+                match
+            )
+
+            if not match:
+                return False
+
+        return True
+
 class BuscaKMP(EstrategiaDeBusca):
     nome = "KMP"
     complexidade_melhor = "O(n)"
     complexidade_media = "O(n+m)"
     complexidade_pior = "O(n+m)"
 
-    def _construir_tabela_lps(self, padrao: str) -> List[int]:
-        """
-        Constrói a tabela LPS (Longest Proper Prefix-Suffix).
-        Esta é a pré-computação do KMP, feita em O(m).
-        """
-        m = len(padrao)
-        lps = [0] * m  # lps[0] é sempre 0 (prefixo próprio de 1 char = vazio)
+    def _executar(self, texto, padrao, logger):
+        n, m = len(texto), len(padrao)
+        lps = self._lps(padrao)
 
-        comprimento = 0  # tamanho do prefixo atual
-        i = 1
-
-        while i < m:
-            if padrao[i] == padrao[comprimento]:
-                # Extendemos o prefixo-sufixo em mais um caractere
-                comprimento += 1
-                lps[i] = comprimento
-                i += 1
-            else:
-                if comprimento != 0:
-                    # Tentamos um prefixo menor (não retrocedem em i!)
-                    comprimento = lps[comprimento - 1]
-                else:
-                    # Nenhum prefixo-sufixo possível
-                    lps[i] = 0
-                    i += 1
-
-        return lps
-
-    def buscar(self, texto: str, padrao: str) -> ResultadoBusca:
-        n = len(texto)
-        m = len(padrao)
         posicoes = []
-        passos = []
-        comparacoes = 0
-        numero_passo = 0
-
-        inicio = time.perf_counter()
-
-        if m == 0 or n == 0:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
-
-        lps = self._construir_tabela_lps(padrao)
-
-        i = 0  # cursor no texto  (nunca retrocede!)
-        j = 0  # cursor no padrão
+        i = j = 0
 
         while i < n:
-            comparacoes += 1
-            char_texto = texto[i]
-            char_padrao = padrao[j]
-            houve_match = (char_texto == char_padrao)
+            t, p = texto[i], padrao[j]
+            match = t == p
 
-            # Calcula o salto que faríamos se falhar aqui
-            salto_lps = lps[j - 1] if (not houve_match and j > 0) else None
+            logger.registrar(i, j, f"{t} == {p}", match, extras={"lps": lps})
 
-            passos.append(PassoExecucao(
-                numero_passo=numero_passo,
-                posicao_texto=i,
-                posicao_padrao=j,
-                descricao=f"texto[{i}]='{char_texto}' vs padrão[{j}]='{char_padrao}' | LPS[{j}]={lps[j]}",
-                houve_match=houve_match,
-                destaque_texto=[i],
-                destaque_padrao=[j],
-                dados_extras={"lps": lps[:], "i": i, "j": j, "salto_lps": salto_lps},
-            ))
-            numero_passo += 1
-
-            if houve_match:
-                i += 1  # avança nos dois
+            if match:
+                i += 1
                 j += 1
             else:
                 if j != 0:
-                    # Usa o LPS para saltar → não retrocede i!
                     j = lps[j - 1]
                 else:
-                    i += 1  # nem o primeiro char casou → avança no texto
+                    i += 1
 
-            # Chegou ao fim do padrão → encontrou!
             if j == m:
                 posicoes.append(i - j)
-                j = lps[j - 1]  # prepara para buscar a próxima ocorrência
+                j = lps[j - 1]
 
-        tempo = (time.perf_counter() - inicio) * 1000
-        tabelas = {
-            "lps": [
-                {"indice": idx, "char": padrao[idx], "valor_lps": lps[idx]}
-                for idx in range(m)
-            ],
-        }
-        return self._montar_resultado(texto, padrao, posicoes, comparacoes, passos, tempo, tabelas)
+        return posicoes, {"lps": lps}
 
+    def _lps(self, padrao):
+        lps = [0] * len(padrao)
+        j = 0
 
-#  ALGORITMO 4: BOYER-MOORE
+        for i in range(1, len(padrao)):
+            while j > 0 and padrao[i] != padrao[j]:
+                j = lps[j - 1]
+
+            if padrao[i] == padrao[j]:
+                j += 1
+                lps[i] = j
+
+        return lps
+
 class BuscaBoyerMoore(EstrategiaDeBusca):
     nome = "Boyer-Moore"
-    complexidade_melhor = "O(n/m)"
-    complexidade_media = "O(n)"
-    complexidade_pior = "O(n·m)"
 
-    def _construir_tabela_mau_caractere(self, padrao: str) -> Dict[str, int]:
-        """
-        Tabela de mau caractere: char → último índice no padrão.
-        Chars ausentes retornam -1 quando consultados com .get(char, -1).
-        """
-        tabela = {}
-        for i, char in enumerate(padrao):
-            tabela[char] = i  # sobrescreve → fica só o último índice
-        return tabela
+    def _executar(self, texto, padrao, logger):
+        n, m = len(texto), len(padrao)
+        tabela = self._tabela_mc(padrao)
 
-    def buscar(self, texto: str, padrao: str) -> ResultadoBusca:
-        n = len(texto)
-        m = len(padrao)
         posicoes = []
-        passos = []
-        comparacoes = 0
-        numero_passo = 0
+        shift = 0
 
-        inicio = time.perf_counter()
-
-        if m == 0 or n == 0 or m > n:
-            tempo = (time.perf_counter() - inicio) * 1000
-            return self._montar_resultado(texto, padrao, [], 0, [], tempo)
-
-        tabela_mc = self._construir_tabela_mau_caractere(padrao)
-
-        deslocamento = 0  # quantas posições o padrão está deslocado sobre o texto
-
-        while deslocamento <= n - m:
-
-            # Compara da direita para a esquerda
+        while shift <= n - m:
             j = m - 1
 
             while j >= 0:
-                comparacoes += 1
-                char_texto = texto[deslocamento + j]
-                char_padrao = padrao[j]
-                houve_match = (char_padrao == char_texto)
+                t = texto[shift + j]
+                p = padrao[j]
+                match = t == p
 
-                # Índice do mau caractere no padrão (-1 se não existir)
-                indice_mc = tabela_mc.get(char_texto, -1)
-                salto = max(1, j - indice_mc) if not houve_match else 0
+                logger.registrar(shift + j, j, f"{t} == {p}", match)
 
-                passos.append(PassoExecucao(
-                    numero_passo=numero_passo,
-                    posicao_texto=deslocamento + j,
-                    posicao_padrao=j,
-                    descricao=(
-                        f"texto[{deslocamento+j}]='{char_texto}' vs padrão[{j}]='{char_padrao}' "
-                        f"(direita→esquerda)"
-                    ),
-                    houve_match=houve_match,
-                    destaque_texto=list(range(deslocamento, deslocamento + m)),
-                    destaque_padrao=[j],
-                    dados_extras={
-                        "deslocamento": deslocamento,
-                        "indice_mc": indice_mc,
-                        "salto": salto,
-                        "mau_caractere": char_texto,
-                    },
-                ))
-                numero_passo += 1
-
-                if not houve_match:
-                    break  # achou o mau caractere → calcula salto e pula
+                if not match:
+                    break
                 j -= 1
 
             if j < 0:
-                # j chegou a -1 → casou tudo → encontrou!
-                posicoes.append(deslocamento)
-                prox = tabela_mc.get(texto[deslocamento + m], -1) if deslocamento + m < n else -1
-                deslocamento += m - prox
+                posicoes.append(shift)
+                shift += m
             else:
-                # Aplica a heurística do mau caractere
-                indice_mc = tabela_mc.get(texto[deslocamento + j], -1)
-                deslocamento += max(1, j - indice_mc)
+                shift += max(1, j - tabela.get(texto[shift + j], -1))
 
-        tempo = (time.perf_counter() - inicio) * 1000
-        tabelas = {
-            "mau_caractere": [
-                {"char": char, "ultimo_indice": idx}
-                for char, idx in sorted(tabela_mc.items())
-            ],
-        }
-        return self._montar_resultado(texto, padrao, posicoes, comparacoes, passos, tempo, tabelas)
+        return posicoes, {"mau_caractere": tabela}
+
+    def _tabela_mc(self, padrao):
+        return {c: i for i, c in enumerate(padrao)}
